@@ -5,29 +5,33 @@
    ========================================================= */
 
 :root {
-  /* 白毛玻璃核心参数 (蒙版加实 15%，完全阻隔背后壁纸与时钟人物干扰) */
-  --bg-glass-base: rgba(255, 255, 255, 0.88);
+  /* 冰白工作台：背景负责氛围，卡片负责承载信息 (遮罩加实，阻隔背后壁纸干扰) */
+  --bg-glass-base: rgba(248, 250, 252, 0.78);
   --bg-glass-notch: rgba(255, 255, 255, 0.92);
-  --bg-card: rgba(255, 255, 255, 0.72);
-  --bg-card-hover: rgba(255, 255, 255, 0.96);
-  --bg-input: rgba(255, 255, 255, 0.82);
-  
-  --border-glass: rgba(255, 255, 255, 0.85);
-  --border-card: rgba(0, 0, 0, 0.06);
-  --border-focus: #0284c7;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-hover: rgba(255, 255, 255, 0.97);
+  --bg-input: rgba(255, 255, 255, 0.88);
 
-  /* 文字系统：高对比清晰排版 */
-  --text-main: #0f172a;
-  --text-body: #334155;
-  --text-muted: #64748b;
-  --text-light: #94a3b8;
-  --text-blue: #0284c7;
-  --text-emerald: #10b981;
+  --border-glass: rgba(255, 255, 255, 0.55);
+  --border-card: rgba(148, 163, 184, 0.16);
+  --border-focus: #2684ff;
+
+  /* 文字系统：蓝灰信息层级 */
+  --text-main: #1d2939;
+  --text-body: #344054;
+  --text-muted: #667085;
+  --text-light: #98a2b3;
+  --text-placeholder: #b0b8c4;
+  --text-blue: #2684ff;
+  --text-blue-hover: #1673e6;
+  --text-blue-soft: #eaf4ff;
+  --text-emerald: #22c55e;
   --text-amber: #f59e0b;
+  --text-danger: #ef4444;
 
   --shadow-window: 0 20px 48px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(15, 23, 42, 0.04);
-  --shadow-card: 0 2px 6px rgba(0, 0, 0, 0.03);
-  --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.07);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.03);
+  --shadow-hover: 0 6px 20px rgba(15, 23, 42, 0.05);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", Consolas, monospace;
@@ -211,7 +215,7 @@ html, body {
 }
 
 .btn-window-action.pin.pinned .pin-svg-icon {
-  stroke: #0071e3;
+  stroke: #2684ff;
 }
 
 .btn-window-action.close:hover {
@@ -378,7 +382,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 .cfg-banner-title {
   font-size: 12px;
   font-weight: 700;
-  color: #0369a1;
+  color: #1673e6;
   margin-bottom: 2px;
 }
 
@@ -476,7 +480,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .cfg-metric-value.highlight {
-  color: #0284c7;
+  color: #2684ff;
 }
 
 /* =========================================================
@@ -609,7 +613,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .btn-left-execute-clean:hover {
-  background: #0369a1;
+  background: #1673e6;
 }
 
 .btn-left-execute-clean:disabled {
@@ -629,9 +633,9 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .project-item {
   position: relative;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -646,14 +650,14 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .project-item:hover {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
 }
 
 .project-item.card-selected, .project-item.active {
   background: #ffffff !important;
-  border-color: rgba(0, 113, 227, 0.35) !important;
-  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.1);
+  border-color: rgba(38, 132, 255, 0.4) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
 }
 
 .project-item-main {
@@ -755,7 +759,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .project-bottom-fill {
   height: 100%;
-  background: #0284c7;
+  background: #2684ff;
   border-radius: 1px;
   transition: width 0.3s ease;
 }
@@ -1078,57 +1082,57 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .focus-task-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
   padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: none;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   min-height: 48px;
 }
 
 .focus-task-card:hover {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
   transform: translateY(-1px);
 }
 
 /* 核心视觉主角感：仅当前主力/紧急任务 (Task 1) 拥有 Accent 高光，其余任务退后保持安静克制 */
 .focus-task-card.is-hero {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.07);
-  border-left: 3.5px solid #dc2626; /* 唯一的鲜明紧迫焦点 */
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+  border-color: rgba(148, 163, 184, 0.2);
+  border-left: 2.5px solid #f04461; /* 唯一的鲜明紧迫焦点 */
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .focus-task-card.is-hero:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
 }
 
 .focus-task-card.is-secondary {
-  border-left: 3.5px solid rgba(0, 0, 0, 0.08); /* 柔和平静的次级中性色 */
-  opacity: 0.92;
+  border-left: 2.5px solid rgba(148, 163, 184, 0.28); /* 柔和平静的次级中性色 */
+  opacity: 0.95;
 }
 
-/* 候补排队任务：安静克制的纯净中性灰，无需套娃框与标签，全凭色彩与层级直觉区分 */
+/* 候补排队任务：主动视觉降权，但仍可点击/悬停/展开/操作 */
 .focus-task-card.is-standby {
-  background: rgba(255, 255, 255, 0.45);
-  border-color: rgba(0, 0, 0, 0.03);
-  border-left: 3.5px solid rgba(148, 163, 184, 0.28);
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(148, 163, 184, 0.14);
+  border-left: 2.5px solid rgba(148, 163, 184, 0.24);
   box-shadow: none;
-  opacity: 0.75;
+  opacity: 0.55;
 }
 
 .focus-task-card.is-standby:hover {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(0, 0, 0, 0.07);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(148, 163, 184, 0.24);
   opacity: 1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.05);
 }
 
 .focus-task-card.is-standby .task-title-text {
@@ -1190,7 +1194,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   font-size: 10px;
   font-family: var(--font-mono);
   font-weight: 600;
-  color: #0284c7;
+  color: #2684ff;
   background: rgba(2, 132, 199, 0.08);
   border: 1px solid rgba(2, 132, 199, 0.15);
   padding: 1px 5px;
@@ -1214,10 +1218,10 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 /* 精致 macOS 质感 Checkbox */
 .apple-task-checkbox {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  border: 1.5px solid #cbd5e1;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 1.5px solid #cdd5df;
   background: #ffffff;
   cursor: pointer;
   display: flex;
@@ -1228,13 +1232,13 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .apple-task-checkbox:hover {
-  border-color: #0071e3;
-  background: rgba(0, 113, 227, 0.04);
+  border-color: #2684ff;
+  background: #f4f9ff;
 }
 
 .apple-task-checkbox.checked {
-  background: #10b981;
-  border-color: #10b981;
+  background: #22c55e;
+  border-color: #22c55e;
 }
 
 .apple-task-checkbox.checked::after {
@@ -1290,7 +1294,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .task-folder-action:hover {
   opacity: 1 !important;
-  color: #0071e3;
+  color: #2684ff;
 }
 
 /* 任务卡片快捷删除按键 (悬停卡片时轻柔浮现) */
@@ -1385,7 +1389,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 3px;
@@ -1427,21 +1431,21 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   justify-content: flex-end;
 }
 
-/* 底栏三大操作胶囊：极简 Apple 白毛玻璃风格 */
+/* 底栏三大操作胶囊：统一视觉语言 */
 .btn-sync-glass,
 .btn-ghost-audit,
 .btn-refresh-radar {
-  height: 24px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 6px;
-  font-size: 10px;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-body);
-  padding: 0 8px;
+  color: var(--text-muted);
+  padding: 0 12px;
   cursor: pointer;
   transition: all 0.18s ease;
   backdrop-filter: blur(8px);
@@ -1455,8 +1459,8 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 .btn-refresh-radar:hover {
   background: rgba(255, 255, 255, 0.96);
   color: var(--text-main);
-  border-color: rgba(0, 0, 0, 0.15);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  border-color: rgba(148, 163, 184, 0.28);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
 .btn-sync-glass .sync-icon,
@@ -1487,84 +1491,119 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
 }
 
+/* 复盘中：进入提前复盘状态，圆点脉冲并禁用重复点击 */
+.btn-ghost-audit.auditing {
+  color: var(--text-main);
+  cursor: wait;
+  pointer-events: none;
+  border-color: rgba(38, 132, 255, 0.35);
+}
+
+.btn-ghost-audit.auditing .audit-dot {
+  background: var(--text-blue);
+  animation: audit-dot-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes audit-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(38, 132, 255, 0.55); }
+  50% { box-shadow: 0 0 0 5px rgba(38, 132, 255, 0); }
+}
+
+/* 复盘完成：绿色圆点反馈 */
+.btn-ghost-audit.done .audit-dot {
+  background: var(--text-emerald);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+}
+
+/* 紧凑型工程资讯列表：每条推荐为透明条目 + 分割线，仅在 Hover 时出现轻量高亮 */
 .radar-chinese-card {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  box-shadow: none;
   padding: 10px 12px;
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   position: relative;
-  height: 84px;
+  min-height: 74px;
   box-sizing: border-box;
   flex-shrink: 0;
 }
 
+.radar-chinese-card:last-child {
+  border-bottom: none;
+}
+
 .radar-chinese-card:hover {
-  background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.09);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .radar-chinese-card.card-selected {
-  background: #ffffff !important;
-  border-color: rgba(0, 113, 227, 0.4) !important;
-  box-shadow: 0 4px 16px rgba(0, 113, 227, 0.1);
+  background: rgba(38, 132, 255, 0.07);
 }
 
 .radar-card-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   min-width: 0;
 }
 
+/* 分类 Eyebrow：纯文字，取消灰色胶囊 */
 .radar-muted-tag {
   font-size: 11px;
   font-family: var(--font-sans);
-  font-weight: 700;
-  color: #334155;
-  background: rgba(0, 0, 0, 0.05);
-  padding: 2px 7px;
-  border-radius: 4px;
+  font-weight: 600;
+  color: #667085;
+  background: transparent;
+  padding: 0;
+  border: none;
+  border-radius: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  max-width: 150px;
 }
 
+/* 右上角性能关键词：降级为 Metadata */
 .radar-metric-value {
-  font-size: 14.5px;
-  font-weight: 800;
-  font-family: var(--font-mono);
-  color: #0071e3;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: #3B82C4;
   line-height: 1;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
+/* 标题：绝对视觉核心，最多两行 */
 .radar-card-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 600;
+  color: #1D2939;
   line-height: 1.35;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
 }
 
+/* 摘要：主动弱化，1~2 行 */
 .radar-card-sub {
   font-size: 12px;
-  font-weight: 500;
-  color: #475569;
-  line-height: 1.4;
-  white-space: nowrap;
+  font-weight: 400;
+  color: #7A8495;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
 }
 
@@ -1727,7 +1766,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
-  color: #0071e3;
+  color: #2684ff;
 }
 
 .inspector-meta-dot {
@@ -1745,7 +1784,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .inspector-progress-fill {
   height: 100%;
-  background: #0284c7;
+  background: #2684ff;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -1842,7 +1881,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #0284c7;
+  background: #2684ff;
   flex-shrink: 0;
 }
 
@@ -1881,7 +1920,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 .btn-apple-action.primary {
   background: rgba(0, 113, 227, 0.08);
   border-color: rgba(0, 113, 227, 0.2);
-  color: #0071e3;
+  color: #2684ff;
   font-weight: 600;
 }
 
@@ -2059,7 +2098,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 
 .ver-badge-latest {
   background: rgba(2, 132, 199, 0.12);
-  color: #0284c7;
+  color: #2684ff;
   border: 1px solid rgba(2, 132, 199, 0.3);
 }
 
@@ -2268,7 +2307,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .btn-confirm:hover:not(:disabled) {
-  background: #0369a1;
+  background: #1673e6;
 }
 
 .btn-confirm:disabled {
@@ -2350,13 +2389,15 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   position: absolute;
   top: 466px;
   width: 820px;
-  height: 206px;
+  height: auto;
+  min-height: 146px;
+  max-height: 196px;
   background: var(--bg-glass-base);
   backdrop-filter: blur(36px) saturate(180%);
   -webkit-backdrop-filter: blur(36px) saturate(180%);
   border: 1px solid var(--border-glass);
   border-radius: 14px;
-  box-shadow: var(--shadow-window);
+  box-shadow: 0 -1px 0 rgba(148, 163, 184, 0.16), var(--shadow-window);
   z-index: 15;
   box-sizing: border-box;
   animation: popoverSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2379,8 +2420,9 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 .plan-popover-inner {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding: 12px 14px;
+  min-height: 146px;
+  max-height: 196px;
+  padding: 8px 16px 10px;
   box-sizing: border-box;
 }
 
@@ -2388,8 +2430,10 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 9px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  height: 36px;
+  min-height: 36px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
   flex-shrink: 0;
 }
 
@@ -2405,7 +2449,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  color: #0284c7;
+  color: #2684ff;
   background: rgba(2, 132, 199, 0.08);
   border: 1px solid rgba(2, 132, 199, 0.15);
   padding: 1.5px 7px;
@@ -2482,21 +2526,23 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  padding: 6px 12px;
+  margin-top: 6px;
 }
 
 .plan-section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 28px;
+  min-height: 28px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   flex-shrink: 0;
 }
 
@@ -2509,13 +2555,13 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 .plan-add-row {
   display: flex;
   gap: 6px;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
   flex-shrink: 0;
 }
 
 .plan-subtask-input {
   flex: 1;
-  height: 27px;
+  height: 32px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 6px;
@@ -2527,15 +2573,15 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .plan-subtask-input:focus {
-  border-color: #0284c7;
+  border-color: #2684ff;
   background: #ffffff;
   box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.1);
 }
 
 .btn-plan-add {
-  height: 27px;
-  padding: 0 10px;
-  background: #0284c7;
+  height: 32px;
+  padding: 0 12px;
+  background: #2684ff;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -2547,11 +2593,13 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .btn-plan-add:hover {
-  background: #0369a1;
+  background: #1673e6;
 }
 
 .plan-subtasks-stream {
   flex: 1;
+  min-height: 0;
+  max-height: 64px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -2569,7 +2617,7 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   border: 1px solid rgba(0, 0, 0, 0.03);
   border-radius: 6px;
   transition: all 0.15s ease;
-  min-height: 28px;
+  min-height: 34px;
   box-sizing: border-box;
 }
 
@@ -2659,10 +2707,10 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
 }
 
 .plan-empty-hint {
-  color: var(--text-light);
-  font-size: 11px;
+  color: var(--text-placeholder);
+  font-size: 10.5px;
   text-align: center;
-  padding: 16px 0;
+  padding: 8px 0;
 }
 
 .plan-celebration-banner {
@@ -2677,5 +2725,3 @@ button, input, .project-item, .focus-task-card, .radar-chinese-card, .detail-pop
   margin-top: 4px;
   animation: popoverSlideDown 0.2s ease;
 }
-
-

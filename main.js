@@ -35,11 +35,23 @@ if (!gotTheLock) {
   process.exit(0);
 }
 
+// The stop helper uses the single-instance lock to request a graceful, app-specific exit.
+if (process.argv.includes('--quit')) {
+  app.quit();
+  process.exit(0);
+}
+
 try {
   fs.appendFileSync(path.join(__dirname, 'scripts', 'runtime.log'), `[${new Date().toISOString()}] Process started, PID: ${process.pid}\n`);
 } catch (e) {}
 
-app.on('second-instance', () => {
+app.on('second-instance', (_event, commandLine = []) => {
+  if (commandLine.includes('--quit')) {
+    app.isQuitting = true;
+    app.quit();
+    return;
+  }
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     setExpandedState(true);
@@ -164,6 +176,78 @@ function loadStore() {
     }
   }
   return {};
+}
+
+function isSameOrInsidePath(candidatePath, rootPath) {
+  const root = path.resolve(rootPath);
+  const candidate = path.resolve(candidatePath);
+  const relative = path.relative(root, candidate);
+  return relative === '' || (
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function isStrictlyInsidePath(candidatePath, rootPath) {
+  return path.resolve(candidatePath) !== path.resolve(rootPath) &&
+    isSameOrInsidePath(candidatePath, rootPath);
+}
+
+function isProtectedWorkspacePath(candidatePath) {
+  const normalized = path.resolve(candidatePath).toLowerCase();
+  return normalized.includes(`${path.sep}obsidian_kb${path.sep}`) ||
+    normalized.endsWith(`${path.sep}obsidian_kb`) ||
+    normalized.includes(`${path.sep}opposite${path.sep}`) ||
+    normalized.endsWith(`${path.sep}opposite`);
+}
+
+function getTrustedWorkspaceRoots(storeObj = loadStore()) {
+  const candidates = [
+    ...(Array.isArray(storeObj.projects) ? storeObj.projects.map(project => project && project.path) : []),
+    ...(Array.isArray(storeObj.tasks)
+      ? storeObj.tasks.filter(task => task && !task.completed).map(task => task.customPath)
+      : [])
+  ];
+  const roots = new Set();
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' || !candidate.trim()) continue;
+    let resolved;
+    try {
+      resolved = path.resolve(candidate);
+      if (isProtectedWorkspacePath(resolved) || path.parse(resolved).root === resolved) continue;
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) continue;
+    } catch (e) {
+      continue;
+    }
+    roots.add(resolved);
+  }
+
+  return Array.from(roots);
+}
+
+function authorizeWorkspaceRoots(requestedPaths, storeObj = loadStore()) {
+  if (!Array.isArray(requestedPaths)) return [];
+  const trustedRoots = getTrustedWorkspaceRoots(storeObj);
+  const authorized = new Set();
+
+  for (const requested of requestedPaths) {
+    if (typeof requested !== 'string' || !requested.trim()) continue;
+    let resolved;
+    try {
+      resolved = path.resolve(requested);
+      if (isProtectedWorkspacePath(resolved) || path.parse(resolved).root === resolved) continue;
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) continue;
+    } catch (e) {
+      continue;
+    }
+    if (trustedRoots.some(root => isSameOrInsidePath(resolved, root))) {
+      authorized.add(resolved);
+    }
+  }
+
+  return Array.from(authorized);
 }
 
 function saveStore(data) {
@@ -1072,8 +1156,13 @@ ipcMain.handle('scan-task-workspaces', async (_event, workspacePaths) => {
   if (!Array.isArray(workspacePaths) || workspacePaths.length === 0) {
     return { success: true, items: [] };
   }
+  const currentStore = loadStore();
+  const authorizedRoots = authorizeWorkspaceRoots(workspacePaths, currentStore);
+  if (authorizedRoots.length === 0) {
+    return { success: false, error: '目标目录不属于已登记的项目或在办任务工作区', items: [] };
+  }
   try {
-    return await deepScanAndClusterWorkspaces(workspacePaths, 4);
+    return await deepScanAndClusterWorkspaces(authorizedRoots, 4);
   } catch (err) {
     console.error('[scan-task-workspaces] Deep scan error:', err);
     return { success: false, error: err.message, items: [] };
@@ -1086,9 +1175,24 @@ ipcMain.handle('clean-task-workspaces', async (_event, workspacePaths, explicitI
     return { success: true, cleanedCount: 0, freedBytes: 0, freedFormatted: '0 B', cleanedItems: [] };
   }
 
-  const allowedRoots = workspacePaths.map(p => path.resolve(p));
+  const currentStore = loadStore();
+  const allowedRoots = authorizeWorkspaceRoots(workspacePaths, currentStore);
+  if (allowedRoots.length === 0) {
+    return {
+      success: false,
+      error: '没有可清理的已登记工作区',
+      cleanedCount: 0,
+      failedCount: 0,
+      freedBytes: 0,
+      freedFormatted: '0 B',
+      cleanedItems: [],
+      failedItems: []
+    };
+  }
+
   let totalFreed = 0;
   const cleanedItems = [];
+  const failedItems = [];
 
   // 如果前端传入了用户审查复选确认的明细路径列表，严格仅清理选中的项
   if (Array.isArray(explicitItems) && explicitItems.length > 0) {
@@ -1102,21 +1206,29 @@ ipcMain.handle('clean-task-workspaces', async (_event, workspacePaths, explicitI
           sizeFormatted: res.sizeFormatted,
           trashed: res.trashed
         });
+      } else {
+        failedItems.push({ path: itemPath, error: res && res.error ? res.error : '清理失败' });
       }
     }
 
+    const success = failedItems.length === 0 && cleanedItems.length > 0;
     return {
-      success: true,
+      success,
+      error: failedItems.length > 0
+        ? `有 ${failedItems.length} 项未能移入回收站`
+        : (success ? null : '清理候选已变化，请重新扫描'),
       cleanedCount: cleanedItems.length,
+      failedCount: failedItems.length,
       freedBytes: totalFreed,
       freedFormatted: formatBytes(totalFreed),
-      cleanedItems
+      cleanedItems,
+      failedItems
     };
   }
 
   // 兜底全量清理：先深度扫描，仅清理非受保护项（中间过渡版本与编译垃圾），绝不触碰稳定版与最新版！
   try {
-    const scanRes = await deepScanAndClusterWorkspaces(workspacePaths, 4);
+    const scanRes = await deepScanAndClusterWorkspaces(allowedRoots, 4);
     const candidates = (scanRes.items || []).filter(it => !it.isProtected);
     for (const cand of candidates) {
       const res = await safeTrashOrDelete(cand.fullPath, allowedRoots);
@@ -1128,18 +1240,27 @@ ipcMain.handle('clean-task-workspaces', async (_event, workspacePaths, explicitI
           sizeFormatted: res.sizeFormatted,
           trashed: res.trashed
         });
+      } else {
+        failedItems.push({ path: cand.fullPath, error: res && res.error ? res.error : '清理失败' });
       }
     }
   } catch (e) {
     console.error('[clean-task-workspaces] Auto clean error:', e);
+    failedItems.push({ path: '', error: e.message || '清理异常' });
   }
 
+  const success = failedItems.length === 0 && cleanedItems.length > 0;
   return {
-    success: true,
+    success,
+    error: failedItems.length > 0
+      ? `有 ${failedItems.length} 项未能移入回收站`
+      : (success ? null : '没有找到可清理项，请重新扫描'),
     cleanedCount: cleanedItems.length,
+    failedCount: failedItems.length,
     freedBytes: totalFreed,
     freedFormatted: formatBytes(totalFreed),
-    cleanedItems
+    cleanedItems,
+    failedItems
   };
 });
 
@@ -1178,11 +1299,16 @@ ipcMain.handle('scan-weekly-workspaces', async () => {
 });
 
 // GitHub 级工作区安全归档与直接清理（支持移入 .archive 备份或彻底删除释放空间）
-ipcMain.handle('execute-workspace-clean', async (_event, { targetPath, items, permanentDelete }) => {
+ipcMain.handle('execute-workspace-clean', async (_event, payload = {}) => {
+  const { targetPath, items, permanentDelete } = payload || {};
   if (!Array.isArray(items) || items.length === 0) {
     return { success: false, error: '未选择清理项目' };
   }
 
+  const currentStore = loadStore();
+  const trustedRoots = getTrustedWorkspaceRoots(currentStore);
+  const failedItems = [];
+  const cleanedItems = [];
   const dateTag = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   let movedCount = 0;
   let totalBytesFreed = 0;
@@ -1190,71 +1316,117 @@ ipcMain.handle('execute-workspace-clean', async (_event, { targetPath, items, pe
 
   try {
     for (const item of items) {
-      if (!item.path || !fs.existsSync(item.path)) continue;
+      if (!item || typeof item.path !== 'string' || !item.path.trim() || !fs.existsSync(item.path)) {
+        failedItems.push({ path: item && item.path ? item.path : '', error: '清理目标已不存在，请重新扫描' });
+        continue;
+      }
 
-      totalBytesFreed += (item.sizeBytes || 0);
+      const requestedRoot = item.workspacePath || targetPath;
+      const workspaceRoot = typeof requestedRoot === 'string'
+        ? path.resolve(requestedRoot)
+        : '';
+      const isTrustedRoot = workspaceRoot &&
+        trustedRoots.some(root => isSameOrInsidePath(workspaceRoot, root));
+      const sourcePath = path.resolve(item.path);
+
+      if (!isTrustedRoot || !isStrictlyInsidePath(sourcePath, workspaceRoot) || isProtectedWorkspacePath(sourcePath)) {
+        failedItems.push({ path: item.path, error: '清理路径不在已登记的工作区内' });
+        continue;
+      }
+
+      const currentFindings = scanPathForHygiene(workspaceRoot, path.basename(workspaceRoot));
+      const finding = currentFindings.find(candidate => path.resolve(candidate.path) === sourcePath);
+      if (!finding) {
+        failedItems.push({ path: item.path, error: '清理目标已不符合工作区扫描规则' });
+        continue;
+      }
+
+      if (!permanentDelete && sourcePath === path.resolve(workspaceRoot, '.archive')) {
+        failedItems.push({ path: item.path, error: '不能把归档目录移入它自身，请使用归档清理操作' });
+        continue;
+      }
 
       if (permanentDelete) {
         // 直接从磁盘彻底删除，真正释放磁盘空间
-        if (fs.statSync(item.path).isDirectory()) {
-          fs.rmSync(item.path, { recursive: true, force: true });
+        if (fs.statSync(sourcePath).isDirectory()) {
+          fs.rmSync(sourcePath, { recursive: true, force: true });
         } else {
-          fs.unlinkSync(item.path);
+          fs.unlinkSync(sourcePath);
         }
         movedCount++;
       } else {
-        const wsRoot = item.workspacePath || targetPath || path.dirname(item.path);
-        const archiveDir = path.join(wsRoot, '.archive', `cleanup_${dateTag}`);
+        const archiveDir = path.resolve(workspaceRoot, '.archive', `cleanup_${dateTag}`);
         archiveDirs.add(archiveDir);
         fs.mkdirSync(archiveDir, { recursive: true });
 
-        const rel = item.relPath || path.basename(item.path);
-        const targetArchiveLoc = path.join(archiveDir, rel);
+        const rel = finding.relPath || path.basename(sourcePath);
+        const targetArchiveLoc = path.resolve(archiveDir, rel);
+        if (!isStrictlyInsidePath(targetArchiveLoc, archiveDir) || targetArchiveLoc === sourcePath) {
+          failedItems.push({ path: item.path, error: '归档目标路径无效' });
+          continue;
+        }
         fs.mkdirSync(path.dirname(targetArchiveLoc), { recursive: true });
 
         try {
-          fs.renameSync(item.path, targetArchiveLoc);
+          fs.renameSync(sourcePath, targetArchiveLoc);
         } catch (renameErr) {
           // 若跨卷或被锁定则采用安全拷贝后清理
-          if (fs.statSync(item.path).isDirectory()) {
-            fs.cpSync(item.path, targetArchiveLoc, { recursive: true });
-            fs.rmSync(item.path, { recursive: true, force: true });
+          if (fs.statSync(sourcePath).isDirectory()) {
+            fs.cpSync(sourcePath, targetArchiveLoc, { recursive: true, errorOnExist: true, force: false });
+            fs.rmSync(sourcePath, { recursive: true, force: true });
           } else {
-            fs.copyFileSync(item.path, targetArchiveLoc);
-            fs.unlinkSync(item.path);
+            fs.copyFileSync(sourcePath, targetArchiveLoc, fs.constants.COPYFILE_EXCL);
+            fs.unlinkSync(sourcePath);
           }
         }
         movedCount++;
       }
+
+      totalBytesFreed += finding.sizeBytes || 0;
+      cleanedItems.push({
+        name: path.basename(sourcePath),
+        relPath: finding.relPath || path.basename(sourcePath),
+        category: finding.category || '构建垃圾',
+        sizeBytes: finding.sizeBytes || 0,
+        workspaceName: finding.workspaceName || path.basename(workspaceRoot)
+      });
     }
 
     return {
-      success: true,
+      success: failedItems.length === 0,
+      error: failedItems.length > 0 ? `有 ${failedItems.length} 项未能清理` : null,
       movedCount,
       totalBytesFreed,
       isPermanent: Boolean(permanentDelete),
       archiveDir: Array.from(archiveDirs)[0] || null,
-      cleanedItems: items.map(it => ({
-        name: path.basename(it.path),
-        relPath: it.relPath || path.basename(it.path),
-        category: it.category || '构建垃圾',
-        sizeBytes: it.sizeBytes || 0,
-        workspaceName: it.workspaceName || ''
-      }))
+      cleanedItems,
+      failedItems
     };
   } catch (err) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message, movedCount, totalBytesFreed, cleanedItems, failedItems };
   }
 });
 
 // 彻底清空指定归档目录，完全释放磁盘
 ipcMain.handle('purge-archive-dir', async (_event, dirPath) => {
   try {
-    if (dirPath && fs.existsSync(dirPath)) {
-      fs.rmSync(dirPath, { recursive: true, force: true });
-      return { success: true };
+    if (typeof dirPath !== 'string' || !dirPath.trim() || !fs.existsSync(dirPath)) {
+      return { success: false, error: '归档目录不存在或已清空' };
     }
-    return { success: false, error: '归档目录不存在或已清空' };
+
+    const candidate = path.resolve(dirPath);
+    const isAuthorizedArchive = getTrustedWorkspaceRoots().some(root => {
+      const archiveRoot = path.resolve(root, '.archive');
+      return path.dirname(candidate) === archiveRoot &&
+        path.basename(candidate).startsWith('cleanup_') &&
+        isStrictlyInsidePath(candidate, archiveRoot);
+    });
+    if (!isAuthorizedArchive || !fs.statSync(candidate).isDirectory()) {
+      return { success: false, error: '仅允许清理已登记工作区内的 cleanup_ 归档目录' };
+    }
+
+    fs.rmSync(candidate, { recursive: true, force: true });
+    return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }

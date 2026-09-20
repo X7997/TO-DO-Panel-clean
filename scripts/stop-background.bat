@@ -1,3 +1,4 @@
 @echo off
-taskkill /F /IM electron.exe /T >nul 2>&1
-echo [OK] TO-DO Panel ÒÑÍêÈ«Í£Ö¹¡£
+setlocal
+node "%~dp0stop-background.js"
+exit /b %errorlevel%

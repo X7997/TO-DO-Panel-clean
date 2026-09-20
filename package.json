@@ -4,7 +4,9 @@
   "description": "TO-DO Panel — 极客桌面贴顶工作台 (Top-Notch Bento Workstation)",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/launch-background.js",
+    "start:dev": "electron .",
+    "stop": "node scripts/stop-background.js",
     "test": "electron . --smoke-test"
   },
   "keywords": [

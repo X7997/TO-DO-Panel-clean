@@ -1,6 +1,16 @@
-﻿node_modules/
+node_modules/
+dist/
+out/
+coverage/
+
+# Local app state can contain personal tasks, workspace paths, and API settings.
+/data/store.json
+/data/backups/*.json
+
+# Runtime output
 *.log
-scripts/runtime.log
 scripts/debug_output.txt
+
+# OS metadata
 .DS_Store
 Thumbs.db

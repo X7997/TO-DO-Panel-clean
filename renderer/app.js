@@ -24,6 +24,7 @@ let collapseTimeout = null;
 let radarDrawerTimeout = null;
 let isSelectingFolder = false;
 let isPinned = false;
+let twilightReviewing = false;
 
 // DOM 元素缓存
 const notchPill = document.getElementById('notch-pill');
@@ -515,9 +516,9 @@ async function init() {
     inputQuickAdd.addEventListener('keydown', handleQuickAddKeydown);
   }
 
-  // 晚间复盘模态框 (移至右下角)
+  // 晚间复盘：点击直接进入「复盘中」状态并提前复盘 (不弹模态框)，20:30 亦可由定时任务自动执行
   if (btnTwilightAudit) {
-    btnTwilightAudit.addEventListener('click', openDailyAuditModal);
+    btnTwilightAudit.addEventListener('click', startTwilightReview);
   }
   btnCompleteAudit.addEventListener('click', () => {
     modalDailyAudit.classList.remove('open');
@@ -533,6 +534,14 @@ async function init() {
   });
   btnAuditOpenKb.addEventListener('click', () => {
     window.desktopAPI.openInExplorer('Q:\\Obsidian_KB\\00_Index_索引\\_master-index.md');
+  });
+
+  // 点击模态框半透明遮罩空白区域关闭（修复「20:30 复盘」弹窗打开后无法返回/卡死的问题）
+  [modalDailyAudit, modalRadarConfig].forEach((m) => {
+    if (!m) return;
+    m.addEventListener('click', (e) => {
+      if (e.target === m) closeAllModals();
+    });
   });
 
   // 左栏同步 Obsidian 知识库 (标题栏刷新按钮 + 底栏同步胶囊双向联动)
@@ -921,9 +930,11 @@ function closeAllModals() {
 
 async function saveCurrentStore() {
   try {
-    await window.desktopAPI.saveStore(store);
+    const result = await window.desktopAPI.saveStore(store);
+    return !result || result.success !== false;
   } catch (e) {
     console.error('Store save error:', e);
+    return false;
   }
 }
 
@@ -1016,30 +1027,58 @@ function updateInputProgress() {
 
 // 3. 左栏：进行中项目
 // 交互规则：Apple 极简排版，悬浮出现微型删除键，点击卡片向左弹出锚定 Inspector 详情浮窗
+// 计算「本周活跃项目」标识：仅统计存在未完成任务关联到的项目 code / id
+function getActiveProjectKeys() {
+  const codes = new Set();
+  const ids = new Set();
+  (store.tasks || []).forEach(t => {
+    if (t.completed) return;
+    const code = (t.projectCode || '').toUpperCase();
+    if (code && code !== '待选' && code !== '待做' && code !== '未分类') {
+      codes.add(code);
+    }
+    if (t.projectId) ids.add(String(t.projectId));
+  });
+  return { codes, ids };
+}
+
 function renderProjects() {
   if (!projectListContainer) return;
-  projectListContainer.innerHTML = '';
-  if (projectCountBadge) projectCountBadge.textContent = store.projects.length;
 
-  store.projects.forEach(proj => {
+  // 核心：只展示本周活跃（存在未完成任务关联）的项目，无待办的项目不上屏；
+  // 初始无任何在办任务时回退为全量展示，保证首屏不空。
+  const active = getActiveProjectKeys();
+  const hasActiveTasks = active.codes.size > 0 || active.ids.size > 0;
+  const visibleProjects = hasActiveTasks
+    ? store.projects.filter(proj =>
+        active.codes.has((proj.code || '').toUpperCase()) ||
+        active.ids.has(String(proj.id)))
+    : store.projects;
+
+  projectListContainer.innerHTML = '';
+  if (projectCountBadge) projectCountBadge.textContent = visibleProjects.length;
+
+  visibleProjects.forEach(proj => {
     const isSelected = currentLeftPopoverProjectId === proj.id;
     const isFiltered = activeProjectFilter === proj.id;
+    const progress = clampPercent(proj.progress);
+    const accentColor = safeCssColor(proj.color, '#2684ff');
     const item = document.createElement('div');
     item.className = `project-item ${isSelected ? 'card-selected' : ''} ${isFiltered ? 'active' : ''}`;
 
     item.innerHTML = `
       <div class="project-item-main">
         <div class="project-item-left">
-          <span class="project-code-clean">#${proj.code}</span>
-          <span class="project-name-clean" title="${proj.name}">${proj.name}</span>
+          <span class="project-code-clean">#${escapeHtml(proj.code)}</span>
+          <span class="project-name-clean" title="${escapeHtml(proj.name)}">${escapeHtml(proj.name)}</span>
         </div>
         <div class="project-item-right-actions">
-          <span class="project-pct-clean">${proj.progress}%</span>
-          <button class="btn-delete-project" title="从工作区删除 #${proj.code} 工程">✕</button>
+          <span class="project-pct-clean">${progress}%</span>
+          <button class="btn-delete-project" title="从工作区删除 #${escapeHtml(proj.code)} 工程">✕</button>
         </div>
       </div>
       <div class="project-bottom-line">
-        <div class="project-bottom-fill" style="width: ${proj.progress}%; background: ${proj.color || '#0071e3'};"></div>
+        <div class="project-bottom-fill" style="width: ${progress}%; background: ${accentColor};"></div>
       </div>
     `;
 
@@ -1062,15 +1101,32 @@ function renderProjects() {
   });
 }
 
-// 从工作区彻底删除指定工程，并同步清理关联任务与持久化标记，杜绝同步复活
+function normalizeWorkspacePath(value) {
+  return String(value || '').replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
+}
+
+function workspacePathsOverlap(pathA, pathB) {
+  const a = normalizeWorkspacePath(pathA);
+  const b = normalizeWorkspacePath(pathB);
+  if (!a || !b) return false;
+  return a === b || a.startsWith(`${b}\\`) || b.startsWith(`${a}\\`);
+}
+
+// 与 P35 项目约定一致：清理后移出活跃工作区并记录黑名单，避免知识库同步将项目复活。
 async function autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, targetWorkspaces = []) {
   // 安全清理保护：立即锁定 6 秒防最小化保护期，确保鼠标留在展开工作区时绝不误关闭
   if (typeof window.setPreventMinimize === 'function') {
     window.setPreventMinimize(6000);
   }
 
-  const normWorkspaces = (targetWorkspaces || []).map(w => (w || '').toLowerCase().replace(/[\\/]+$/, ''));
+  const normWorkspaces = (targetWorkspaces || []).map(normalizeWorkspacePath).filter(Boolean);
   const deletedNames = [];
+  const previousProjects = store.projects;
+  const previousTasks = store.tasks;
+  const hadDeletedProjectCodes = Object.prototype.hasOwnProperty.call(store, 'deletedProjectCodes');
+  const previousDeletedProjectCodes = Array.isArray(store.deletedProjectCodes)
+    ? [...store.deletedProjectCodes]
+    : store.deletedProjectCodes;
 
   if (!store.deletedProjectCodes) {
     store.deletedProjectCodes = [];
@@ -1080,8 +1136,8 @@ async function autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, ta
   store.projects = (store.projects || []).filter(p => {
     const isIdMatch = Boolean(targetProjectId && p.id === targetProjectId);
     const isCodeMatch = Boolean(targetProjectCode && p.code && p.code.toUpperCase() === targetProjectCode.toUpperCase());
-    const pPathNorm = (p.path || '').toLowerCase().replace(/[\\/]+$/, '');
-    const isPathMatch = normWorkspaces.some(ws => ws && ws.length > 3 && (ws === pPathNorm || ws.includes(pPathNorm) || pPathNorm.includes(ws)));
+    const pPathNorm = normalizeWorkspacePath(p.path);
+    const isPathMatch = Boolean(pPathNorm) && normWorkspaces.some(ws => ws.length > 3 && workspacePathsOverlap(ws, pPathNorm));
 
     if (isIdMatch || isCodeMatch || isPathMatch) {
       deletedNames.push(p.name || p.code);
@@ -1108,24 +1164,34 @@ async function autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, ta
     if (targetProjectId && t.projectId === targetProjectId) return false;
     if (targetProjectCode && t.projectCode && t.projectCode.toUpperCase() === targetProjectCode.toUpperCase()) return false;
     if (t.customPath) {
-      const tNorm = t.customPath.toLowerCase().replace(/[\\/]+$/, '');
-      if (normWorkspaces.some(ws => ws && ws.length > 3 && (ws === tNorm || ws.includes(tNorm) || tNorm.includes(ws)))) {
+      const tNorm = normalizeWorkspacePath(t.customPath);
+      if (tNorm && normWorkspaces.some(ws => ws.length > 3 && workspacePathsOverlap(ws, tNorm))) {
         return false;
       }
     }
     return true;
   });
 
+  const saved = await saveCurrentStore();
+  if (!saved) {
+    store.projects = previousProjects;
+    store.tasks = previousTasks;
+    if (hadDeletedProjectCodes) store.deletedProjectCodes = previousDeletedProjectCodes;
+    else delete store.deletedProjectCodes;
+    renderProjects();
+    renderTasks();
+    updateInputProgress();
+    return { success: false, error: '项目移出状态未能写入本地 store，已保留原列表' };
+  }
+
   if (currentLeftPopoverProjectId === targetProjectId || currentLeftPopoverProjectId === '__clean_review__') {
     closeLeftPopover();
   }
-
-  await saveCurrentStore();
   renderProjects();
   renderTasks();
   updateInputProgress();
 
-  return deletedNames;
+  return { success: true, deletedNames };
 }
 
 // 从工作区列表彻底删除指定工程
@@ -1133,8 +1199,12 @@ async function deleteProject(projectId) {
   const proj = store.projects.find(p => p.id === projectId);
   if (!proj) return;
   const name = proj.name || proj.code;
-  await autoRemoveWorkspaceProject(proj.id, proj.code, [proj.path, getProjectRealFolder(proj)]);
-  showToast(`已从工作区彻底删除 #${proj.code} ${name}`);
+  const result = await autoRemoveWorkspaceProject(proj.id, proj.code, [proj.path, getProjectRealFolder(proj)]);
+  if (!result.success) {
+    showToast(`未能移出 #${proj.code} ${name}: ${result.error}`);
+    return;
+  }
+  showToast(`已从活跃工作区移出 #${proj.code} ${name}；源码目录保留`);
 }
 
 // =========================================================
@@ -1171,6 +1241,8 @@ function openLeftPopover(proj, cardEl) {
   const realPath = getProjectRealFolder(proj);
 
   const renderContent = () => {
+    const progress = clampPercent(proj.progress);
+    const accentColor = safeCssColor(proj.color, '#2684ff');
     const projectTasks = store.tasks.filter(t => t.projectId === proj.id || t.projectCode === proj.code);
     const pendingTasks = projectTasks.filter(t => !t.completed);
     const displayTasks = pendingTasks.slice(0, 4);
@@ -1178,9 +1250,9 @@ function openLeftPopover(proj, cardEl) {
     let tasksHtml = '';
     if (displayTasks.length > 0) {
       tasksHtml = displayTasks.map(t => `
-        <div class="inspector-task-row" title="${t.text}">
-          <span class="inspector-task-dot" style="background:${proj.color || '#0071e3'};"></span>
-          <span class="inspector-task-text">${t.text}</span>
+        <div class="inspector-task-row" title="${escapeHtml(t.text)}">
+          <span class="inspector-task-dot" style="background:${accentColor};"></span>
+          <span class="inspector-task-text">${escapeHtml(t.text)}</span>
         </div>
       `).join('');
     } else {
@@ -1199,20 +1271,20 @@ function openLeftPopover(proj, cardEl) {
 
     leftPopoverContent.innerHTML = `
       <div class="inspector-meta-bar">
-        <span class="inspector-meta-item">${proj.progress === 100 ? '已完成' : '进行中'}</span>
+        <span class="inspector-meta-item">${progress === 100 ? '已完成' : '进行中'}</span>
         <span class="inspector-meta-dot">·</span>
-        <span class="inspector-meta-item" title="${realPath}">${realPath}</span>
+        <span class="inspector-meta-item" title="${escapeHtml(realPath)}">${escapeHtml(realPath)}</span>
         <span class="inspector-meta-dot">·</span>
-        <span class="inspector-metric-pill">${proj.progress}%</span>
+        <span class="inspector-metric-pill">${progress}%</span>
       </div>
       <div class="inspector-progress-line">
-        <div class="inspector-progress-fill" style="width: ${proj.progress}%; background: ${proj.color || '#0071e3'};"></div>
+        <div class="inspector-progress-fill" style="width: ${progress}%; background: ${accentColor};"></div>
       </div>
 
       <div class="inspector-divider"></div>
 
       <div class="inspector-desc-block">
-        ${summaryText}
+        ${escapeHtml(summaryText)}
       </div>
 
       <div class="inspector-divider"></div>
@@ -1286,9 +1358,13 @@ function openLeftPopover(proj, cardEl) {
             return;
           }
           if (!res.items || res.items.length === 0) {
-            // 工作区极净，无构建冗余缓存：直接自动移出工作区，无需用户二次操作！
-            await autoRemoveWorkspaceProject(proj.id, proj.code, [realPath, proj.path]);
-            showToast(`✅ 工程 #${proj.code} 极净无冗余，已自动从工作区移出！`);
+            // 即使没有可回收缓存，完成项目清理也应按 P35 约定退出活跃工作区。
+            const removal = await autoRemoveWorkspaceProject(proj.id, proj.code, [realPath, proj.path]);
+            if (!removal.success) {
+              showToast(`未能移出工作区: ${removal.error}`);
+              return;
+            }
+            showToast(`✅ 工程 #${proj.code} 已从活跃工作区移出；源码目录保留`);
           } else {
             openCleanReviewPopover(res.items, [realPath], proj.id, proj.code);
           }
@@ -1368,14 +1444,18 @@ function openCleanReviewPopover(initialItems, targetWorkspaces, targetProjectId,
   currentLeftPopoverProjectId = '__clean_review__';
   activeProjectFilter = null;
   document.querySelectorAll('.project-item').forEach(el => el.classList.remove('card-selected'));
+  // 筛选状态变化后立即重绘任务区，避免清理审查中仍显示旧项目的过滤结果。
+  renderTasks();
+  updateInputProgress();
 
   leftPopoverTag.textContent = `${initialItems.length}项`;
   leftPopoverTitle.textContent = '工作区瘦身审查';
 
   const renderReviewContent = (currentItems) => {
     if (currentItems.length === 0) {
-      autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, targetWorkspaces).then(() => {
-        showToast(`✅ 工作区极净无冗余，已自动移出工作区！`);
+      autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, targetWorkspaces).then((result) => {
+        if (result.success) showToast('✅ 工作区无待清理缓存，项目已从活跃工作区移出');
+        else showToast(`未能移出工作区: ${result.error}`);
       });
       return;
     }
@@ -1389,6 +1469,11 @@ function openCleanReviewPopover(initialItems, targetWorkspaces, targetProjectId,
       const isChecked = !item.isProtected;
       const isDisabled = item.isProtected ? 'disabled' : '';
       const itemClass = `clean-review-item ${item.isProtected ? 'clean-item-protected' : ''}`;
+      const encodedPath = escapeHtml(encodeURIComponent(item.fullPath || ''));
+      const workspaceName = escapeHtml(item.workspaceName || '');
+      const relativePath = escapeHtml(item.relativePath || '');
+      const roleLabel = escapeHtml(item.roleLabel || item.category || '');
+      const roleDesc = escapeHtml(item.roleDesc || item.category || '');
 
       return `
         <label class="${itemClass}" data-idx="${idx}" title="${item.isProtected ? '该文件为系统识别的稳定基准或最新活跃版本，已受保护保留' : '中间过渡版本或编译垃圾，建议清理'}">
@@ -1397,20 +1482,20 @@ function openCleanReviewPopover(initialItems, targetWorkspaces, targetProjectId,
             class="clean-item-cb" 
             ${isChecked ? 'checked' : ''} 
             ${isDisabled} 
-            data-path="${encodeURIComponent(item.fullPath)}" 
+            data-path="${encodedPath}"
             data-protected="${item.isProtected ? '1' : '0'}" 
           />
           <div class="clean-review-info">
             <div class="clean-review-name-row">
               <span class="clean-review-name">${escapeHtml(item.name)}</span>
-              <span class="clean-review-size">${item.sizeFormatted}</span>
+              <span class="clean-review-size">${escapeHtml(item.sizeFormatted || '')}</span>
             </div>
             <div class="clean-review-meta-row">
-              <span class="ver-badge ${badgeClass}">${item.roleLabel || item.category}</span>
+              <span class="ver-badge ${badgeClass}">${roleLabel}</span>
               ${item.isProtected ? '<span style="font-size:9.5px;color:#059669;font-weight:600;">🔒 已保护</span>' : ''}
             </div>
-            <span class="clean-review-desc">${escapeHtml(item.roleDesc || item.category)}</span>
-            <span class="clean-review-ws" title="${item.fullPath}">${item.workspaceName} / ${item.relativePath}</span>
+            <span class="clean-review-desc">${roleDesc}</span>
+            <span class="clean-review-ws" title="${escapeHtml(item.fullPath || '')}">${workspaceName} / ${relativePath}</span>
           </div>
         </label>
       `;
@@ -1441,7 +1526,7 @@ function openCleanReviewPopover(initialItems, targetWorkspaces, targetProjectId,
 
         <div class="clean-review-actions">
           <button class="btn-confirm-clean" id="btn-execute-clean">
-            <span>🗑️ 安全移入回收站并移出工作区</span>
+            <span>🗑️ 安全移入回收站</span>
             <span id="clean-btn-size-label">(0 B)</span>
           </button>
         </div>
@@ -1531,20 +1616,28 @@ function openCleanReviewPopover(initialItems, targetWorkspaces, targetProjectId,
 
         try {
           const res = await window.desktopAPI.cleanTaskWorkspaces(targetWorkspaces, selectedPaths);
-          if (!res || !res.success) {
-            showToast(`清理失败: ${res ? res.error : '未知错误'}`);
+          if (!res || !res.success || !(Number(res.cleanedCount) > 0)) {
+            const failedCount = res && Number.isFinite(res.failedCount) ? `（${res.failedCount} 项失败）` : '';
+            const reason = res && res.error ? res.error : '没有候选实际移入回收站';
+            showToast(`清理失败${failedCount}: ${reason}`);
             cleanBtn.disabled = false;
-            cleanBtn.textContent = '安全移入回收站并移出工作区';
+            cleanBtn.textContent = '安全移入回收站';
             return;
           }
 
-          // 核心自动化：清理完成后，自动将该工程及关联在办任务从工作区中彻底移除，无需用户多余点击！
-          await autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, targetWorkspaces);
-          showToast(`✅ 清理完成，释放 ${res.freedFormatted}！已送入系统回收站并移出工作区`);
+          // 清理候选已移入回收站后，复用统一移出流程并持久化黑名单，杜绝知识库同步复活。
+          const removal = await autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, targetWorkspaces);
+          if (!removal.success) {
+            showToast(`缓存已移入回收站，但项目状态未能保存: ${removal.error}`);
+            cleanBtn.disabled = false;
+            cleanBtn.textContent = '安全移入回收站';
+            return;
+          }
+          showToast(`✅ 清理完成，释放 ${res.freedFormatted}；项目已从活跃工作区移出，源码目录保留`);
         } catch (e) {
           showToast(`清理异常: ${e.message}`);
           cleanBtn.disabled = false;
-          cleanBtn.textContent = '安全移入回收站并移出工作区';
+          cleanBtn.textContent = '安全移入回收站';
         }
       });
     }
@@ -1607,7 +1700,7 @@ function renderTrophies() {
     return;
   }
 
-  displayTrophies.slice(0, 25).forEach(t => {
+    displayTrophies.slice(0, 25).forEach(t => {
     const weekday = getTrophyWeekday(t);
     const row = document.createElement('div');
     row.className = 'trophy-item';
@@ -1616,7 +1709,7 @@ function renderTrophies() {
       <div class="trophy-left">
         <span class="trophy-weekday-tag">${weekday}</span>
         <span class="trophy-check" title="点击取消完成并切换回待做">✓</span>
-        <span class="trophy-text" title="${t.text}">${t.text}</span>
+        <span class="trophy-text" title="${escapeHtml(t.text)}">${escapeHtml(t.text)}</span>
       </div>
       <div class="trophy-actions">
         <button class="btn-undo-trophy" title="切换回复活至待做">撤销</button>
@@ -1674,13 +1767,23 @@ function deleteTrophyTask(trophyId) {
 // 辅助函数：HTML 转义
 // =========================================================
 function escapeHtml(str) {
-  if (!str) return '';
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function clampPercent(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0;
+}
+
+function safeCssColor(value, fallback = '#2684ff') {
+  const color = String(value || '').trim();
+  return /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.test(color) ? color : fallback;
 }
 
 // =========================================================
@@ -1925,11 +2028,11 @@ function renderTasks() {
         <div class="task-stripe-trigger" title="点击记录想法与方案拆解"></div>
         <button class="apple-task-checkbox" title="勾选完成"></button>
         <div class="task-body">
-          <span class="task-proj-code">${task.projectCode || '待做'}</span>
-          <div class="task-title-text" title="${task.text}">${task.text}</div>
+        <span class="task-proj-code">${escapeHtml(task.projectCode || '待做')}</span>
+          <div class="task-title-text" title="${escapeHtml(task.text)}">${escapeHtml(task.text)}</div>
           ${subtaskBadgeHtml}
         </div>
-        <span class="task-folder-action" title="${realFolder ? '打开真实工程: ' + realFolder : '未绑定 (点击选择工作区)'}">
+        <span class="task-folder-action" title="${escapeHtml(realFolder ? '打开真实工程: ' + realFolder : '未绑定 (点击选择工作区)')}">
           ${realFolder ? '📂' : '＋'}
         </span>
         <button class="btn-delete-task" title="删除该任务">✕</button>
@@ -2166,11 +2269,11 @@ function renderRadar() {
 
     card.innerHTML = `
       <div class="radar-card-top-row">
-        <span class="radar-muted-tag">${item.tag}</span>
-        <span class="radar-metric-value">${item.metricNum}</span>
+        <span class="radar-muted-tag">${escapeHtml(item.tag)}</span>
+        <span class="radar-metric-value">${escapeHtml(item.metricNum)}</span>
       </div>
-      <div class="radar-card-title">${item.shortTitle || item.title}</div>
-      <div class="radar-card-sub">${item.hook}</div>
+      <div class="radar-card-title">${escapeHtml(item.shortTitle || item.title)}</div>
+      <div class="radar-card-sub">${escapeHtml(item.hook)}</div>
     `;
 
     // 点击卡片：向右侧外弹出锚定详情浮窗 (绝不向中栏覆盖)
@@ -2236,17 +2339,17 @@ function openRightPopover(item, cardEl) {
   const renderContent = () => {
     rightPopoverContent.innerHTML = `
       <div class="inspector-meta-bar">
-        <span class="inspector-metric-pill">${item.metricNum}</span>
+        <span class="inspector-metric-pill">${escapeHtml(item.metricNum)}</span>
         <span class="inspector-meta-dot">·</span>
-        <span class="inspector-meta-item">${item.metricLabel}</span>
+        <span class="inspector-meta-item">${escapeHtml(item.metricLabel)}</span>
         <span class="inspector-meta-dot">·</span>
-        <span class="inspector-meta-item">★ ${item.stars} · GitHub</span>
+        <span class="inspector-meta-item">★ ${escapeHtml(item.stars)} · GitHub</span>
       </div>
 
       <div class="inspector-divider"></div>
 
       <div class="inspector-quote">
-        “${item.douyinQuote || item.hook}”
+        “${escapeHtml(item.douyinQuote || item.hook)}”
       </div>
 
       <div class="inspector-divider"></div>
@@ -2256,14 +2359,14 @@ function openRightPopover(item, cardEl) {
           <span class="inspector-bullet red">●</span>
           <div class="inspector-point-body">
             <div class="inspector-point-label">痛点根因</div>
-            <div class="inspector-point-text">${item.pain}</div>
+            <div class="inspector-point-text">${escapeHtml(item.pain)}</div>
           </div>
         </div>
         <div class="inspector-point-item">
           <span class="inspector-bullet green">●</span>
           <div class="inspector-point-body">
             <div class="inspector-point-label">处方解法</div>
-            <div class="inspector-point-text">${item.cure}</div>
+            <div class="inspector-point-text">${escapeHtml(item.cure)}</div>
           </div>
         </div>
       </div>
@@ -2344,6 +2447,46 @@ function formatBytes(bytes) {
 // =========================================================
 // 8. 晚间复盘审阅官 & 20:30 GitHub 开源雷达定时器 (路线 B)
 // =========================================================
+// 点击「20:30 复盘」：直接进入「复盘中」状态并提前执行复盘 (拉取今日 GitHub 热门)，
+// 不弹出审计模态框；复盘完成后按钮短暂显示「已复盘」再回落到常规状态。
+async function startTwilightReview() {
+  if (twilightReviewing) {
+    showToast('复盘进行中，请稍候...');
+    return;
+  }
+  twilightReviewing = true;
+  btnTwilightAudit.classList.add('auditing');
+  twilightStatusText.textContent = '复盘中...';
+
+  try {
+    await autoFetchRadarAtTwilight(true);
+
+    // 记录今日已完成复盘，20:30 定时器当天不再重复触发
+    if (!store.settings) store.settings = {};
+    const todayStr = new Date().toISOString().split('T')[0];
+    store.settings.lastRadarFetchDate = todayStr;
+    await saveCurrentStore();
+
+    btnTwilightAudit.classList.remove('auditing');
+    btnTwilightAudit.classList.add('done');
+    twilightStatusText.textContent = '已复盘';
+    showToast('✅ 复盘完成，今日 GitHub 热门已刷新');
+  } catch (err) {
+    console.error('Twilight review error:', err);
+    btnTwilightAudit.classList.remove('auditing');
+    twilightStatusText.textContent = '20:30 复盘';
+    showToast(`复盘异常: ${err.message || '未知错误'}`);
+  } finally {
+    twilightReviewing = false;
+    setTimeout(() => {
+      if (!twilightReviewing) {
+        btnTwilightAudit.classList.remove('done');
+        checkTwilightStatus();
+      }
+    }, 3000);
+  }
+}
+
 function checkTwilightStatus() {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -2493,7 +2636,7 @@ function openDailyAuditModal() {
     row.style.fontSize = '10px';
 
     row.innerHTML = `
-      <span style="color:var(--text-main);font-weight:500;">#${proj.code} ${proj.name}</span>
+      <span style="color:var(--text-main);font-weight:500;">#${escapeHtml(proj.code)} ${escapeHtml(proj.name)}</span>
       <span style="color:${projTrophies.length > 0 ? 'var(--text-emerald)' : 'var(--text-muted)'};">
         ${projTrophies.length > 0 ? `完成 ${projTrophies.length} 项` : '今日暂无完成'}
       </span>

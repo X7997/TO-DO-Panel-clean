@@ -1,4 +1,7 @@
 @echo off
-taskkill /F /IM electron.exe /T >nul 2>&1
-ping 127.0.0.1 -n 2 >nul 2>&1
-node Q:\Todo\scripts\launch-background.js
+setlocal
+node "%~dp0stop-background.js"
+if errorlevel 1 exit /b %errorlevel%
+timeout /t 2 /nobreak >nul
+node "%~dp0launch-background.js"
+exit /b %errorlevel%

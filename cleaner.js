@@ -514,6 +514,16 @@ function clusterFamilyFiles(files, groupKey, dirPath, wsPath, wsName, outputItem
 /**
  * 安全清理执行：优先送入 Windows 回收站，支持一键还原
  */
+function isPathStrictlyInside(rootPath, candidatePath) {
+  const root = path.resolve(rootPath);
+  const candidate = path.resolve(candidatePath);
+  const relative = path.relative(root, candidate);
+  return relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative);
+}
+
 async function safeTrashOrDelete(itemPath, allowedRoots = [], allowProtected = false) {
   if (!itemPath || typeof itemPath !== 'string' || !fs.existsSync(itemPath)) {
     return { success: false, error: '文件不存在' };
@@ -523,7 +533,7 @@ async function safeTrashOrDelete(itemPath, allowedRoots = [], allowProtected = f
 
   // 1. 安全边界检查：必须严格位于目标工作区内部
   if (allowedRoots.length > 0) {
-    const isInside = allowedRoots.some(root => normPath.startsWith(root) && normPath !== root);
+    const isInside = allowedRoots.some(root => isPathStrictlyInside(root, normPath));
     if (!isInside) {
       return { success: false, error: '未授权路径，禁止删除' };
     }
@@ -549,34 +559,27 @@ async function safeTrashOrDelete(itemPath, allowedRoots = [], allowProtected = f
   const stats = fs.statSync(normPath);
   const sz = stats.isDirectory() ? getDirSizeBytes(normPath) : stats.size;
 
-  let trashed = false;
+  let electronShell = null;
   try {
-    let electronShell = null;
-    try {
-      electronShell = require('electron').shell;
-    } catch (e) {}
+    electronShell = require('electron').shell;
+  } catch (e) {}
 
-    if (electronShell && typeof electronShell.trashItem === 'function') {
-      await electronShell.trashItem(normPath);
-      trashed = true;
-    }
-  } catch (trashErr) {
-    console.warn(`[Clean] shell.trashItem failed for ${normPath}, falling back:`, trashErr);
+  if (!electronShell || typeof electronShell.trashItem !== 'function') {
+    return { success: false, error: '系统回收站不可用，未执行清理' };
   }
 
-  if (!trashed) {
-    if (stats.isDirectory()) {
-      fs.rmSync(normPath, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(normPath);
-    }
+  try {
+    await electronShell.trashItem(normPath);
+  } catch (trashErr) {
+    console.warn(`[Clean] shell.trashItem failed for ${normPath}:`, trashErr);
+    return { success: false, error: `移入系统回收站失败: ${trashErr.message || trashErr}` };
   }
 
   return {
     success: true,
     size: sz,
     sizeFormatted: formatBytes(sz),
-    trashed,
+    trashed: true,
     name: base,
     path: normPath
   };
@@ -589,4 +592,3 @@ module.exports = {
   deepScanAndClusterWorkspaces,
   safeTrashOrDelete
 };
-
