@@ -1184,6 +1184,11 @@ async function autoRemoveWorkspaceProject(targetProjectId, targetProjectCode, ta
     return { success: false, error: '项目移出状态未能写入本地 store，已保留原列表' };
   }
 
+  // 项目已移出时一并清除项目筛选，否则任务区仍按已删除的项目 ID 过滤而显示空白。
+  if (activeProjectFilter === targetProjectId) {
+    activeProjectFilter = null;
+  }
+
   if (currentLeftPopoverProjectId === targetProjectId || currentLeftPopoverProjectId === '__clean_review__') {
     closeLeftPopover();
   }
