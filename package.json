@@ -1,0 +1,22 @@
+{
+  "name": "todo-panel",
+  "version": "1.0.0",
+  "description": "TO-DO Panel — 极客桌面贴顶工作台 (Top-Notch Bento Workstation)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "electron . --smoke-test"
+  },
+  "keywords": [
+    "todo",
+    "desktop-hud",
+    "electron",
+    "glassmorphism",
+    "productivity"
+  ],
+  "author": "Q",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; connect-src *;">
+  <title>TO-DO Panel - 极客贴顶工作台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-white-glass">
+
+  <div class="stage-wrapper" id="stage-wrapper">
+    <!-- 展开态工作台 (820x460px)，支持按住顶部自由拖拽移动 -->
+    <div id="bento-container" class="bento-container">
+      
+      <!-- 原生硬件拖拽顶栏：按住可随意移动窗口至桌面任意位置 -->
+      <div class="window-drag-bar" id="window-drag-bar">
+        <div class="drag-bar-left">
+          <span class="drag-status-dot"></span>
+          <span class="drag-bar-title">TO-DO 工作台</span>
+        </div>
+        <div class="drag-handle-center" title="按住拖拽移动窗口至桌面任意位置">
+          <span class="drag-grip"></span>
+        </div>
+        <div class="drag-bar-actions">
+          <button id="btn-pin-panel" class="btn-window-action pin" title="固定置顶常驻 (开启后不自动收起)">
+            <svg class="pin-svg-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="17" x2="12" y2="22"></line>
+              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.89A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.89A2 2 0 0 0 5 15.24V17z"></path>
+            </svg>
+          </button>
+          <button id="btn-collapse-panel" class="btn-window-action close" title="最小化隐藏至后台 (Esc)">✕</button>
+        </div>
+      </div>
+
+      <!-- 极简黄金三栏布局 (210px / 1fr / 270px) 比例和谐，任务绝不横向拉长变形 -->
+      <main class="bento-grid">
+        
+        <!-- 左栏：工程与战果 (210px) -->
+        <section class="bento-col left-col">
+          <!-- 进行中项目 (常驻展示，点击向左弹出锚定浮窗，绝不向中展开) -->
+          <div class="project-area">
+            <div class="section-header">
+              <div class="section-title-group">
+                <span class="section-title">进行中项目</span>
+                <span class="section-badge" id="project-count-badge">0</span>
+              </div>
+              <button class="btn-refresh-project-header" id="btn-refresh-projects" title="重新从知识库扫描并刷新活跃工程">
+                <span class="refresh-icon-spin">⟳</span>
+              </button>
+            </div>
+            <div class="project-list custom-scroll" id="project-list-container">
+              <!-- 渲染项目 -->
+            </div>
+          </div>
+
+          <!-- 本周战果 (蒙版加实 15%，完全阻隔背后壁纸干扰) -->
+          <div class="trophy-area">
+            <div class="section-header">
+              <span class="section-title">本周战果</span>
+              <button class="btn-clear-trophies" id="btn-clear-trophies" title="清空所有已完成战果">清空</button>
+            </div>
+            <div class="trophy-week-bar" id="trophy-week-bar">
+              <button class="day-filter-btn active" data-day="all">全部</button>
+              <button class="day-filter-btn" data-day="1">一</button>
+              <button class="day-filter-btn" data-day="2">二</button>
+              <button class="day-filter-btn" data-day="3">三</button>
+              <button class="day-filter-btn" data-day="4">四</button>
+              <button class="day-filter-btn" data-day="5">五</button>
+              <button class="day-filter-btn" data-day="6">六</button>
+              <button class="day-filter-btn" data-day="0">日</button>
+            </div>
+            <div class="trophy-list custom-scroll" id="trophy-list-container">
+              <!-- 渲染已完成 -->
+            </div>
+          </div>
+        </section>
+
+        <!-- 中栏：今日专注 (比例和谐，自然聚焦，融合流体进度条) -->
+        <section class="bento-col center-task-col">
+          
+          <!-- 极简单行输入框 (融合今日完成度流体背景与徽标) -->
+          <div class="quick-add-wrap" id="quick-add-wrap">
+            <div class="input-progress-ambient" id="input-progress-fill" style="width: 0%;"></div>
+            <input 
+              type="text" 
+              id="input-quick-add" 
+              placeholder="+ 输入今日任务..." 
+              autocomplete="off"
+            />
+            <div class="input-progress-badge" id="input-progress-badge" title="今日完成度：已完成 / (今日待做 + 已完成)">
+              <span class="badge-ratio" id="input-progress-ratio">0/0</span>
+              <span class="badge-pct" id="input-progress-pct">0%</span>
+            </div>
+          </div>
+
+          <!-- 任务卡片主列表容器 (前三为主角与次级聚焦，后续任务以纯净中性灰呈现，支持丝滑滚动) -->
+          <div class="focus-task-slots custom-scroll" id="focus-slots-container">
+            <!-- 渲染任务流 (首要/次级/灰度候补) -->
+          </div>
+
+        </section>
+
+        <!-- 右栏：开源雷达推荐 (270px · 标签+大标题+核心指标第一视觉层级，向右侧外弹出浮窗) -->
+        <section class="bento-col right-radar-col">
+          <div class="radar-section">
+            <div class="section-header">
+              <div class="section-title-group">
+                <span class="section-title">开源雷达</span>
+                <span class="radar-section-badge" id="radar-badge-status" title="点击配置 GitHub Token 与配额查看">神级推荐</span>
+              </div>
+              <button class="btn-section-radar-cfg" id="btn-radar-settings" title="配置 GitHub 官方 Token 与 20:30 定时抓取">
+                <span class="radar-cfg-icon">⚙️</span>
+              </button>
+            </div>
+
+            <!-- 精简爆款痛点卡片流 (点击在右侧外弹出浮窗，绝不覆盖中栏) -->
+            <div class="radar-card-stream custom-scroll" id="radar-stream-container">
+              <!-- 渲染 10 大神级开源工具 -->
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- 原生对称全宽底栏 (32px · 与顶栏完美对称，单条连续细边框，绝无参差断截) -->
+      <div class="window-bottom-bar" id="window-bottom-bar">
+        <div class="bottom-bar-left">
+          <button class="btn-sync-glass" id="btn-sync-kb-projects" title="从 Obsidian 知识库扫描并刷新项目">
+            <span class="sync-icon">⟳</span>
+            <span>同步知识库</span>
+          </button>
+        </div>
+        <div class="bottom-bar-center">
+          <button id="btn-twilight-audit" class="btn-ghost-audit" title="晚间 20:30 复盘审阅">
+            <span class="audit-dot"></span>
+            <span id="twilight-status-text">20:30 复盘</span>
+          </button>
+        </div>
+        <div class="bottom-bar-right">
+          <button id="btn-refresh-radar" class="btn-refresh-radar" title="换一批开源雷达推荐">
+            <span class="radar-refresh-icon">⟳</span>
+            <span>换一批</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. 左侧锚定详情浮窗 (向左滑出展开，紧贴被点击卡片，绝不遮挡今日任务主区域) -->
+    <div id="left-detail-popover" class="detail-popover popover-left" style="display: none;">
+      <div class="popover-inner" id="left-popover-inner">
+        <div class="popover-head">
+          <div class="popover-title-row">
+            <span class="popover-tag" id="left-popover-tag">#P35</span>
+            <span class="popover-title" id="left-popover-title">TO-DO Panel</span>
+          </div>
+          <button class="popover-close-btn" id="btn-close-left-popover" title="关闭 (Esc)">✕</button>
+        </div>
+
+        <div class="popover-body custom-scroll" id="left-popover-content">
+          <!-- 动态渲染：状态/优先级/进度条、简介、当前任务、下一步规划、底部操作 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 右侧锚定详情浮窗 (向右滑出展开，紧贴被点击卡片，绝不遮挡今日任务主区域) -->
+    <div id="right-detail-popover" class="detail-popover popover-right" style="display: none;">
+      <div class="popover-inner" id="right-popover-inner">
+        <div class="popover-head">
+          <div class="popover-title-row">
+            <span class="popover-tag radar-tag-badge" id="right-popover-tag">GitHub神级补丁</span>
+            <span class="popover-title" id="right-popover-title">taste-skills</span>
+          </div>
+          <button class="popover-close-btn" id="btn-close-right-popover" title="关闭 (Esc)">✕</button>
+        </div>
+
+        <div class="popover-body custom-scroll" id="right-popover-content">
+          <!-- 动态渲染：指标大字(11ms/6MB/60帧)、痛点引用口播、痛点扎心/神级处方、GitHub直达与追踪 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. 底部方案拆解小窗 (从整个组件正下方滑出展开，逐个击破拆解清单与方案灵感备忘) -->
+    <div id="bottom-plan-popover" class="plan-popover-bottom" style="display: none;">
+      <div class="plan-popover-inner">
+        <!-- 头部：项目/任务标识、进度百分比、关闭键 -->
+        <div class="plan-popover-head">
+          <div class="plan-head-left">
+            <span class="plan-proj-tag" id="plan-popover-tag">#P35</span>
+            <span class="plan-task-title" id="plan-popover-title">方案拆解与灵感笔记</span>
+            <span class="plan-badge-sub">逐个击破</span>
+          </div>
+          <div class="plan-head-center">
+            <div class="plan-progress-wrap">
+              <div class="plan-progress-bar">
+                <div class="plan-progress-fill" id="plan-progress-fill" style="width: 0%;"></div>
+              </div>
+              <span class="plan-progress-text" id="plan-progress-text">0/0 完成 (0%)</span>
+            </div>
+          </div>
+          <div class="plan-head-right">
+            <button class="popover-close-btn" id="btn-close-plan-popover" title="关闭 (Esc)">✕</button>
+          </div>
+        </div>
+
+        <!-- 主体：逐个击破拆解清单 (全幅聚焦) -->
+        <div class="plan-subtasks-col">
+          <div class="plan-section-title">
+            <span>🎯 逐个击破拆解清单</span>
+            <span class="plan-subtasks-count" id="plan-subtasks-count">0 项</span>
+          </div>
+          <!-- 极简单行输入框 -->
+          <div class="plan-add-row">
+            <input 
+              type="text" 
+              id="input-add-subtask" 
+              class="plan-subtask-input" 
+              placeholder="+ 添加拆解步骤或灵感... (按 Enter 添加)" 
+              autocomplete="off"
+            />
+            <button id="btn-add-subtask" class="btn-plan-add">＋添加</button>
+          </div>
+          <!-- 滚动子任务流 (每个带小矩形框) -->
+          <div class="plan-subtasks-stream custom-scroll" id="plan-subtasks-container">
+            <!-- 动态渲染拆解步骤 -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /stage-wrapper -->
+
+  <!-- 模态框 2：开源雷达 GitHub Token 与定时配置 (白毛玻璃) -->
+  <div class="modal-overlay" id="modal-radar-config">
+    <div class="modal-window radar-config-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>⚙️ 开源雷达 · 官方 Token 模式 (路线 B)</span>
+        </div>
+        <button class="modal-close" id="btn-close-radar-cfg">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="radar-cfg-banner">
+          <div class="cfg-banner-title">🌙 每日 20:30 暮色自动定时拉取</div>
+          <div class="cfg-banner-desc">每天仅在 20:30 执行 1 次轻量检索，额度消耗率 0.02%，永不超额。</div>
+        </div>
+
+        <div class="cfg-form-group">
+          <label class="cfg-label">GitHub Personal Access Token (PAT):</label>
+          <div class="cfg-input-row">
+            <input type="password" id="input-github-token" class="cfg-input" placeholder="自动检测本机凭证，或输入 ghp_..." autocomplete="off" />
+            <button class="btn-eye-toggle" id="btn-toggle-token-visible" title="显示/隐藏 Token">👁️</button>
+          </div>
+          <div class="cfg-hint" id="token-source-hint">探测系统环境凭证中...</div>
+        </div>
+
+        <div class="cfg-metrics-card">
+          <div class="cfg-metric-row">
+            <span class="cfg-metric-name">Search API 配额 (检索专用)</span>
+            <span class="cfg-metric-value" id="radar-quota-search">30 / 30 次/分钟</span>
+          </div>
+          <div class="cfg-metric-row">
+            <span class="cfg-metric-name">Core API 配额 (常规请求)</span>
+            <span class="cfg-metric-value" id="radar-quota-core">5000 / 5000 次/小时</span>
+          </div>
+          <div class="cfg-metric-row">
+            <span class="cfg-metric-name">20:30 定时抓取状态</span>
+            <span class="cfg-metric-value highlight" id="radar-schedule-status">每日 20:30 自动执行 (今天待触发)</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" id="btn-test-fetch-radar">🧪 测试抓取最新爆款</button>
+        <button class="btn-confirm" id="btn-save-radar-cfg">保存配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模态框 3：晚间复盘审阅官 (干净白透) -->
+  <div class="modal-overlay" id="modal-daily-audit">
+    <div class="modal-window audit-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>晚间复盘审阅</span>
+        </div>
+        <button class="modal-close" id="btn-close-audit">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="hero-stats">
+          <div class="stat-cell">
+            <span class="stat-val" id="audit-stat-done">0</span>
+            <span class="stat-lbl">今日搞定</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-val" id="audit-stat-rate">0%</span>
+            <span class="stat-lbl">前三完成率</span>
+          </div>
+          <div class="stat-cell">
+            <span class="stat-val" id="audit-stat-trophies">0</span>
+            <span class="stat-lbl">本周累计</span>
+          </div>
+        </div>
+        <div class="audit-project-breakdown" id="audit-project-breakdown"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-outline" id="btn-audit-open-kb">打开 Obsidian 知识库</button>
+        <button class="btn-confirm" id="btn-complete-audit">收官休息</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轻量浮动提示 -->
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

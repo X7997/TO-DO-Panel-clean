@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; connect-src *;">
+  <title>开源雷达 · 神级项目推荐</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    .radar-popout-window {
+      width: 340px;
+      height: 468px;
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(36px) saturate(180%);
+      -webkit-backdrop-filter: blur(36px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      border-radius: 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 12px 14px;
+      animation: popoutIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes popoutIn {
+      from { opacity: 0; transform: translateX(12px) scale(0.98); }
+      to { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    .popout-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    .popout-title-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .popout-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .popout-badge {
+      font-size: 8px;
+      font-weight: 700;
+      color: #0284c7;
+      background: rgba(2, 132, 199, 0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .btn-popout-close {
+      background: transparent;
+      border: none;
+      font-size: 13px;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .btn-popout-close:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: #0f172a;
+    }
+    .popout-card-stream {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 2px;
+    }
+    .radar-popout-card {
+      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s ease;
+    }
+    .radar-popout-card:hover {
+      border-color: #0284c7;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.12);
+      transform: translateY(-1px);
+    }
+    .card-top-bar {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .card-metric-num {
+      font-size: 15px;
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #0284c7;
+    }
+    .card-badge {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #c026d3;
+      background: rgba(192, 38, 211, 0.08);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+    .card-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.35;
+    }
+    .card-douyin-quote {
+      font-size: 9.5px;
+      font-weight: 500;
+      color: #334155;
+      line-height: 1.45;
+      background: rgba(2, 132, 199, 0.05);
+      border-left: 2.5px solid #0284c7;
+      padding: 5px 8px;
+      border-radius: 4px;
+    }
+    .card-breakdown {
+      font-size: 8.5px;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      background: #f8fafc;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.03);
+    }
+    .card-pain {
+      color: #dc2626;
+    }
+    .card-cure {
+      color: #059669;
+    }
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+      padding-top: 4px;
+      border-top: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .btn-card-gh {
+      flex: 1;
+      background: #0284c7;
+      border: none;
+      color: #ffffff;
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+    .btn-card-gh:hover {
+      background: #0369a1;
+    }
+    .btn-card-track {
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      color: #0f172a;
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .btn-card-track:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    .popout-toast {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 10px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    .popout-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="radar-popout-window">
+    <div class="popout-header">
+      <div class="popout-title-box">
+        <span class="popout-title">⚡ 开源雷达</span>
+        <span class="popout-badge">神级项目直通</span>
+      </div>
+      <button class="btn-popout-close" id="btn-close-window" title="关闭 (Esc)">✕</button>
+    </div>
+
+    <div class="popout-card-stream custom-scroll" id="popout-stream-container">
+      <!-- 渲染 5 大爆款卡片 -->
+    </div>
+
+    <div class="popout-toast" id="popout-toast">已添加待办</div>
+  </div>
+
+  <script src="radar.js"></script>
+</body>
+</html>
