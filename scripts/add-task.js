@@ -79,14 +79,25 @@ function main() {
   const planNotesInput = payload.planNotes ? payload.planNotes.trim() : '';
   const rawSubtasks = Array.isArray(payload.subtasks) ? payload.subtasks : [];
 
-  if (!fs.existsSync(STORE_PATH)) {
-    console.error(`错误: 找不到数据文件 ${STORE_PATH}`);
-    process.exit(1);
-  }
-
   let store;
   try {
-    store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf-8'));
+    if (fs.existsSync(STORE_PATH)) {
+      store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf-8'));
+    } else {
+      fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
+      store = {
+        projects: [],
+        tasks: [],
+        trophies: [],
+        techRadar: [],
+        settings: {
+          autoCollapseOnBlur: true,
+          twilightHour: 20,
+          twilightMinute: 30
+        },
+        deletedProjectCodes: []
+      };
+    }
   } catch (err) {
     console.error(`解析 store.json 失败:`, err.message);
     process.exit(1);
@@ -99,13 +110,20 @@ function main() {
   let matchedProject = null;
   if (projectCodeInput) {
     matchedProject = store.projects.find(p => 
-      p.code.toUpperCase() === projectCodeInput || 
-      p.id.toUpperCase() === projectCodeInput.toLowerCase()
+      (p.code && String(p.code).toUpperCase() === projectCodeInput) ||
+      (p.id && String(p.id).toUpperCase() === projectCodeInput)
     );
   }
 
-  // 默认项目优先使用匹配项目，其次使用首个项目，最后兜底 p35
-  const defaultProj = store.projects[0] || { id: 'p35', code: 'P35', path: 'Q:\\Todo' };
+  // 默认项目优先使用匹配项目，其次使用首个项目，最后使用当前检出目录。
+  const appRoot = path.resolve(__dirname, '..');
+  const defaultProj = store.projects[0] || {
+    id: 'todo-panel',
+    code: 'LOCAL',
+    name: 'TO-DO Panel',
+    path: appRoot
+  };
+  if (store.projects.length === 0) store.projects.push(defaultProj);
   const targetProj = matchedProject || defaultProj;
 
   // 格式化子任务为贴顶工作台原生标准格式

@@ -281,15 +281,13 @@ function saveStore(data) {
   }
 }
 
-// 监听数据文件变动，支持跨 Agent / 外部脚本实时热重载
-if (fs.existsSync(DATA_FILE)) {
-  fs.watchFile(DATA_FILE, { interval: 800 }, () => {
-    const currentStore = loadStore();
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('store-updated', currentStore);
-    }
-  });
-}
+// 始终监听目标文件，包含首次创建场景，支持首次启动时由 CLI 初始化数据并热重载。
+fs.watchFile(DATA_FILE, { interval: 800 }, () => {
+  const currentStore = loadStore();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('store-updated', currentStore);
+  }
+});
 
 function bringToFrontTemp() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
