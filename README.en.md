@@ -6,6 +6,11 @@
 
 TO-DO Panel is not another always-open task window. It is an intent-triggered workbench for project-based work: wake it with a deliberate hover, see the next few tasks beside the projects they belong to, and send tasks in from a terminal or AI agent without copy-pasting.
 
+## Demo
+
+<p align="center"><img src="assets/to-do-panel-demo.gif" alt="TO-DO Panel open-source radar detail panel" width="580"></p>
+<p align="center"><sub>A 3-second recording of the open-source radar detail view. Personal project and task lists are outside the published crop.</sub></p>
+
 ## The parts worth opening it for
 
 ### A HUD that waits for intent

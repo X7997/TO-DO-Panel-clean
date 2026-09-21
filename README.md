@@ -6,6 +6,11 @@
 
 它不是又一个常驻桌面的待办窗口。TO-DO Panel 把项目、今日主线、工作区治理和开源发现放到一个可随时收起的工作台里，并让终端脚本和 AI Agent 成为一等任务入口。
 
+## 演示
+
+<p align="center"><img src="assets/to-do-panel-demo.gif" alt="TO-DO Panel 开源雷达详情面板演示" width="580"></p>
+<p align="center"><sub>3 秒录屏片段，展示开源雷达展开详情；个人项目和任务列表没有包含在公开画面中。</sub></p>
+
 ## 最好玩的地方
 
 ### 1. 工作台平时“隐身”，只在你有意时出现
