@@ -36,7 +36,7 @@ The cleaner scans registered workspaces for rebuildable caches and versioned art
 
 ### A small evening window onto GitHub
 
-The radar can fetch repository results from GitHub and has a daily 20:30 review path plus manual refresh. It can use a token from the app's local settings, `GITHUB_TOKEN`, or the local `gh` CLI login. Tokens and task data stay in the ignored local `data/` directory; do not commit that directory.
+The radar can fetch repository results from GitHub and has a daily 20:30 review path plus manual refresh. It can make anonymous requests, or use a GitHub Personal Access Token (PAT) from the app's local settings, `GITHUB_TOKEN`, or the local `gh` CLI login. A PAT is a secret. If entered in the app, it is stored as plaintext in this computer's ignored `data/store.json`. Never commit or share that file; use a least-privilege PAT.
 
 ### Keep running after the terminal closes
 

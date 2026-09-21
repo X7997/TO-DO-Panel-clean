@@ -14,3 +14,7 @@ scripts/debug_output.txt
 # OS metadata
 .DS_Store
 Thumbs.db
+# Local environment secrets
+.env
+.env.*
+!.env.example

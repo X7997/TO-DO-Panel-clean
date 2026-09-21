@@ -32,7 +32,7 @@ node scripts/add-task.js --json '{"text":"检查发布文档","projectCode":"P35
 
 ### 5. 每晚看看 GitHub 上的新东西
 
-开源雷达支持手动刷新和每日 `20:30` 复盘入口。GitHub 凭据可来自应用本地设置、`GITHUB_TOKEN` 或本机 `gh` 登录。凭据和任务数据保存在 Git 忽略的本地 `data/` 目录，不能提交到仓库。
+开源雷达支持手动刷新和每日 `20:30` 复盘入口。它可匿名请求 GitHub，也可使用 GitHub Personal Access Token（PAT）：来源包括应用本地设置、`GITHUB_TOKEN` 或本机 `gh` 登录。PAT 是秘密凭据；在应用里输入的 PAT 会以明文保存到本机被 Git 忽略的 `data/store.json`。不要提交或分享该文件，并为 PAT 使用最小权限。
 
 ### 6. 终端关掉，工作台仍能留在托盘
 
