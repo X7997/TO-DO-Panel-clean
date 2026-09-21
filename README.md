@@ -1,60 +1,89 @@
 # TO-DO Panel
 
-基于 Electron 的 Windows 桌面任务与项目工作台。它把快速录入、活跃项目、今日任务、本周战果和开源项目雷达放在一个轻量的三栏面板中。
+> A Windows desktop HUD for people who build things: it stays out of sight until you mean to use it, keeps tasks attached to real project workspaces, and gives AI agents a direct way to add work.
 
-## 功能
+[简体中文](README.zh-CN.md) · [Product brief](docs/PRODUCT_BRIEF.zh-CN.md) · [Developer guide](docs/DEVELOPMENT.md)
 
-- 管理项目与待办任务，支持项目关联、优先级和完成记录。
-- 以白色毛玻璃样式呈现三栏工作区、项目详情和雷达详情。
-- 扫描已登记工作区中的构建缓存与临时产物；用户确认后，将选中项移入 Windows 回收站。
-- 只有清理实际成功后，应用才会从活跃工作区移除对应项目和未完成任务。项目源码目录保留。
-- 托盘菜单支持展开面板、开机启动、置顶和退出。
+TO-DO Panel is not another always-open task window. It is an intent-triggered workbench for project-based work: wake it with a deliberate hover, see the next few tasks beside the projects they belong to, and send tasks in from a terminal or AI agent without copy-pasting.
 
-## 环境要求
+## The parts worth opening it for
 
-- Windows 10/11
-- Node.js 与 npm
-- PowerShell、CIM/WMI（用于独立后台启动）
+### A HUD that waits for intent
 
-## 启动
+The main window is hidden by default. On the Windows desktop, it wakes only when the pointer rests in a tiny top-center target (140 × 6 px) for at least 350 ms. A pressed mouse button, active application, or fast pointer movement cancels the wake-up. The goal is to avoid the always-visible pill and accidental pop-ups that interrupt dragging or coding.
+
+### One workbench, three useful lanes
+
+- **Projects and weekly wins:** keep active work and completed-task trophies in view.
+- **Today's focus:** add a task quickly and keep the first few unfinished tasks visually prominent.
+- **Open-source radar:** review curated GitHub projects and open their details in an outward-facing inspector that leaves the focus lane clear.
+
+Project and radar inspectors open toward the outside edges, so details do not cover the center task lane.
+
+### Let an AI agent add the task
+
+The CLI accepts plain arguments, structured JSON, or a JSON file. A task can carry a project code, workspace path, plan notes, and subtasks. The running app watches its local store and refreshes when an external script changes it.
 
 ```powershell
-cd Q:\Todo
+node scripts/add-task.js --json '{"text":"Review the release flow","projectCode":"P35","planNotes":"Check the cleanup and README changes","subtasks":["Review docs","Check extension points"]}'
+```
+
+See the [CLI payload and extension guide](docs/DEVELOPMENT.md#agent-and-script-integration).
+
+### Clean build clutter without deleting the project
+
+The cleaner scans registered workspaces for rebuildable caches and versioned artifact families. It marks the recognized stable and latest files as protected, shows candidates for review, and sends selected items to the Windows Recycle Bin. If cleanup succeeds, the app removes that project and its unfinished tasks from the active list; the source directory stays on disk.
+
+### A small evening window onto GitHub
+
+The radar can fetch repository results from GitHub and has a daily 20:30 review path plus manual refresh. It can use a token from the app's local settings, `GITHUB_TOKEN`, or the local `gh` CLI login. Tokens and task data stay in the ignored local `data/` directory; do not commit that directory.
+
+### Keep running after the terminal closes
+
+On Windows, `npm start` asks WMI to launch the app as a separate process. The system-tray app remains available after the launching terminal exits. `npm stop` sends an app-specific quit request.
+
+## How the pieces fit
+
+```mermaid
+flowchart LR
+  Agent[AI agent or shell] --> CLI[scripts/add-task.js]
+  CLI --> Store[data/store.json]
+  Store --> Watch[main.js store watcher]
+  Watch --> Bridge[preload.js context bridge]
+  Bridge --> UI[renderer/app.js]
+  UI --> Bridge
+  Bridge --> Main[main.js IPC handlers]
+  Main --> Cleaner[cleaner.js scan and Recycle Bin]
+  Main --> GitHub[GitHub Search API]
+```
+
+## Run it
+
+**Requirements:** Windows 10/11, Node.js/npm, PowerShell and Windows CIM/WMI for detached startup.
+
+```powershell
 npm install
-npm start
+npm run start:dev   # launch from the current terminal while developing
+npm start           # detached Windows background launch
+npm stop            # request a graceful app-specific exit
+npm test            # lightweight Electron smoke launch
 ```
 
-`npm start` 会通过 `Win32_Process.Create` 启动独立的 Electron 进程；成功后命令返回，工作台继续在当前登录会话运行。首次打开时应用会启用 Windows 登录启动。
+The current `npm test` path is a startup smoke check. It does not exercise pointer wake-up, task interactions, the GitHub radar, or cleanup failure cases. The app also currently enables Windows login startup from its normal startup path, including development launches; see the [developer notes](docs/DEVELOPMENT.md#current-development-boundaries).
 
-```powershell
-npm stop                 # 向本应用实例发送正常退出请求
-npm run start:dev        # 前台开发启动，日志留在当前终端
-```
+## Build on it
 
-也可以双击 `scripts/start-background.vbs` 静默启动。后台启动错误会写入 `scripts/background-launch.log`。
+Start with the [developer guide](docs/DEVELOPMENT.md) for the process map, CLI contract, IPC pattern, cleanup invariants, and current portability limits. The [product brief](docs/PRODUCT_BRIEF.zh-CN.md) records the original product goals and why the interaction works this way.
 
-## 清理行为
+Good next contributions include moving the personal `Q:\` workspace map into user configuration, publishing the source/build steps for the native desktop guard, and adding interaction-level tests for wake-up and cleanup.
 
-清理仅接受应用已登记的项目或在办任务工作区，并在执行前重新确认候选路径。选中的缓存或临时文件通过 Electron `shell.trashItem` 移入 Windows 回收站；回收站不可用或清理失败时会返回失败信息，不会退回到永久删除。全部选中项成功移入回收站后，关联项目和未完成任务才会从应用的活跃工作区中移除。
+## Current boundaries
 
-## 本地数据
+- Windows only. The top-edge wake-up depends on `scripts/desktop-guard.exe`.
+- The native guard is checked in as a binary; its C# source/build project is not currently in this repository.
+- Workspace and Obsidian paths are currently tied to this project's `Q:\` setup. The developer guide identifies the mapping locations.
+- `data/store.json` may contain personal paths and a GitHub token. It is ignored by Git and must remain local.
 
-应用首次保存或首次调用 `scripts/add-task.js` 时，会创建 `data/store.json`；后续在 `data/backups/` 保存备份。这些文件已加入 Git 忽略规则；它们可能含本地路径或个人设置，请不要提交或分享。
+## License
 
-## 目录结构
-
-```text
-Q:\Todo\
-├── cleaner.js                 # 工作区扫描与回收站清理
-├── main.js                    # Electron 主进程、IPC 与窗口管理
-├── preload.js                 # 安全 IPC 桥接
-├── renderer/                  # HTML、CSS 与界面交互
-├── scripts/                   # 后台启动、停止与任务辅助脚本
-├── data/                      # 本机运行时数据（Git 忽略）
-├── package.json
-└── LICENSE
-```
-
-## 许可证
-
-本项目采用 [MIT License](LICENSE)。
+MIT. See [LICENSE](LICENSE).
